@@ -1,0 +1,103 @@
+---
+
+# YUM repo URL
+sonarqube_yumrepo_url: http://downloads.sourceforge.net/project/sonar-pkg/rpm
+
+# Additional YUM repo pararms
+sonarqube_yumrepo_params: {}
+
+# Package to be installed (explicit version can be specified here)
+sonarqube_pkg: sonar
+
+# Packages required for the PostgreSQL DB creation
+sonarqube_db_pgsql_pkgs:
+  - python-psycopg2
+
+# Packages required for the MySQL DB creation
+sonarqube_db_mysql_pkgs:
+  - MySQL-python
+
+# Default list of extra packages
+sonarqube_deps_pkgs__default:
+  - java
+
+# Custom list of extra packages
+sonarqube_deps_pkgs__custom: []
+
+# Final list of extra packages
+sonarqube_deps_pkgs: "{{
+  (
+    sonarqube_db_pgsql_pkgs
+      if sonarqube_db_engine == 'postgresql'
+      else
+    sonarqube_db_mysql_pkgs
+      if sonarqube_db_engine == 'mysql'
+      else
+    []
+  ) +
+  sonarqube_deps_pkgs__default +
+  sonarqube_deps_pkgs__custom }}"
+
+# Name of the service
+sonarqube_service: sonar
+
+# Config directory
+sonarqube_conf_dir: /opt/sonar/conf
+
+# DB engine [postgresql|mysql]
+sonarqube_db_engine: postgresql
+
+# User used to create DB and user
+sonarqube_db_login_user: "{{
+  'postgres'
+    if sonarqube_db_engine == 'postgresql'
+    else
+  'root' }}"
+
+# Password used to create DB and user
+sonarqube_db_login_password: "{{
+  'postgres'
+     if sonarqube_db_engine == 'postgresql'
+     else
+  None }}"
+
+# DB server configuration options
+sonarqube_db_host: localhost
+sonarqube_db_port: "{{
+  5432
+    if sonarqube_db_engine == 'postgresql'
+    else
+  3306 }}"
+sonarqube_db_name: sonar
+sonarqube_db_user: sonar
+sonarqube_db_password: sonar
+
+# User used to create DB and user
+sonarqube_db_jdbc_params: "{{
+  '?useUnicode=true&characterEncoding=utf8&useConfigs=maxPerformance&rewriteBatchedStatements=true'
+    if sonarqube_db_engine == 'mysql'
+    else
+  '' }}"
+
+
+# Default options of the DB configuration
+sonar_conf_db__default:
+  sonar.jdbc.username: "{{ sonarqube_db_user }}"
+  sonar.jdbc.password: "{{ sonarqube_db_password }}"
+  sonar.jdbc.url: jdbc:{{ sonarqube_db_engine }}://{{ sonarqube_db_host }}:{{ sonarqube_db_port }}/{{ sonarqube_db_name }}{{ sonarqube_db_jdbc_params }}
+
+# Custom options of the DB configuration
+sonar_conf_db__custom: {}
+
+# Default configuration
+sonar_conf__default: "{{
+  sonar_conf_db__default.update(sonar_conf_db__custom) }}{{
+  sonar_conf_db__default }}"
+
+# Custom configuration
+sonar_conf__custom: {}
+
+# Final configuration
+sonar_conf: "{{
+  sonar_conf__default.update(sonar_conf__custom) }}{{
+  sonar_conf__default }}"

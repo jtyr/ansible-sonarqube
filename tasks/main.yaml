@@ -1,0 +1,109 @@
+---
+
+- name: Test distribution
+  assert:
+    that: >
+      ansible_os_family == 'RedHat'
+
+- name: Add YUM repo
+  yum_repository:
+    name: sonarqube
+    description: SonarQube YUM repo
+    baseurl: "{{ sonarqube_yumrepo_url }}"
+    gpgcheck: no
+    params: "{{ sonarqube_yumrepo_params }}"
+  tags:
+    - sonarqube_pkg
+
+- name: Install additional dependencies packages
+  package:
+    name: "{{ item }}"
+  with_items: "{{ sonarqube_deps_pkgs }}"
+  tags:
+    - sonarqube_pkg
+
+- name: Install SonarQube
+  package:
+    name: "{{ sonarqube_pkg }}"
+  notify:
+    - Restart SonarQube service
+  tags:
+    - sonarqube_pkg
+
+- name: Create PostgreSQL DB
+  postgresql_db:
+    name: "{{ sonarqube_db_name }}"
+    login_user: "{{ sonarqube_db_login_user }}"
+    login_password: "{{ sonarqube_db_login_password }}"
+    login_host: "{{ sonarqube_db_host }}"
+    port: "{{ sonarqube_db_port }}"
+    encoding: UTF-8
+  register: sonarqube_db_pgsql_created
+  when: sonarqube_db_engine == 'postgresql'
+  tags:
+    - sonarqube_db
+
+- name: Create PostgreSQL user
+  postgresql_user:
+    name: "{{ sonarqube_db_user }}"
+    db: "{{ sonarqube_db_name }}"
+    password: "{{ sonarqube_db_password }}"
+    priv: ALL
+    login_user: "{{ sonarqube_db_login_user }}"
+    login_password: "{{ sonarqube_db_login_password }}"
+    login_host: "{{ sonarqube_db_host }}"
+    port: "{{ sonarqube_db_port }}"
+  when: sonarqube_db_engine == 'postgresql'
+  tags:
+    - sonarqube_db
+
+- name: Create MySQL DB
+  mysql_db:
+    name: "{{ sonarqube_db_name }}"
+    login_host: "{{ sonarqube_db_host }}"
+    login_port: "{{ sonarqube_db_port }}"
+    login_user: "{{ sonarqube_db_login_user }}"
+    login_password: "{{ sonarqube_db_login_password }}"
+    encoding: utf8
+  register: sonarqube_db_mysql_created
+  when: sonarqube_db_engine == 'mysql'
+  tags:
+    - sonarqube_db
+
+- name: Create MySQL user
+  mysql_user:
+    login_host: "{{ sonarqube_db_host }}"
+    login_port: "{{ sonarqube_db_port }}"
+    login_user: "{{ sonarqube_db_login_user }}"
+    login_password: "{{ sonarqube_db_login_password }}"
+    name: "{{ sonarqube_db_user }}"
+    password: "{{ sonarqube_db_password }}"
+    priv: "{{ sonarqube_db_name }}.*:ALL"
+  when: sonarqube_db_engine == 'mysql'
+  tags:
+    - sonarqube_db
+
+- name: Configure the properties file
+  template:
+    src: sonar.properties.j2
+    dest: "{{ sonarqube_conf_dir }}/sonar.properties"
+    owner: sonar
+    group: sonar
+    mode: 0640
+  notify:
+    - Restart SonarQube service
+
+- name: Make sure the service is enabled
+  service:
+    name: "{{ sonarqube_service }}"
+    enabled: yes
+  tags:
+    - sonarqube_service
+
+- name: Make sure the service is running
+  service:
+    name: "{{ sonarqube_service }}"
+    state: started
+  register: sonarqube_service_started
+  tags:
+    - sonarqube_service

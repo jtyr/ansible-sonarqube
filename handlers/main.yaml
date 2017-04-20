@@ -1,0 +1,9 @@
+---
+
+- name: Restart SonarQube service
+  service:
+    name: "{{ sonarqube_service }}"
+    state: restarted
+  when: >
+    sonarqube_service_started is not defined or
+    not sonarqube_service_started.changed
